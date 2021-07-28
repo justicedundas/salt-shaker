@@ -1,0 +1,28 @@
+# -*- coding: utf-8 -*-
+# vim: set syntax=yaml ts=2 sw=2 sts=2 et :
+
+---
+vaults:
+  - name: gpg-vault
+    template: fedora-32
+    label: black
+    mem: 400
+    vcpus: 2
+    autostart: False
+
+backends:
+  - name: gpg-backend
+    template: fedora-32
+    label: purple
+    mem: 400
+    vcpus: 2
+    autostart: True
+
+clients:
+  - name: gpg-client
+    template: fedora-32
+    label: blue
+    mem: 400
+    vcpus: 2
+    autostart: False
+

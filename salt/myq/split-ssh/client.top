@@ -1,0 +1,14 @@
+# -*- coding: utf-8 -*-
+# vim: set syntax=yaml ts=2 sw=2 sts=2 et :
+
+user:
+  dom0:
+    - split-ssh.client.vm
+
+  'split-ssh-role:client-template':
+    - match: pillar
+    - split-ssh.client.packages
+
+  'split-ssh-role:client':
+    - match: pillar
+    - split-ssh.client.sock

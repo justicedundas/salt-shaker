@@ -1,0 +1,15 @@
+# -*- coding: utf-8 -*-
+# vim: set syntax=yaml ts=2 sw=2 sts=2 et :
+
+user:
+  dom0:
+    - split-ssh.vault.vm
+
+  'split-ssh-role:vault-template':
+    - match: pillar
+    - split-ssh.vault.packages
+
+  'split-ssh-role:vault':
+    - match: pillar
+    - split-ssh.vault.config
+    - split-ssh.vault.rpc
