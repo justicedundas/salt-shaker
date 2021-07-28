@@ -1,0 +1,317 @@
+#!/bin/sh
+
+SCRIPT_NAME=$(basename $0)
+
+#
+# CONFIGURATION
+#
+
+# Enums
+declare -r COMMAND_START="start"
+declare -r COMMAND_STOP="stop"
+declare -r COMMAND_RESTART="restart"
+declare -r ACTION_LOCAL_STOP="local.stop"
+declare -r ACTION_REMOTE_START="remote.start"
+declare -r ACTION_REMOTE_STOP="remote.stop"
+
+# Default values
+declare -r DEF_TCP_CONNECT_LOCAL_PORT="5037"
+declare -r DEF_TCP_CONNECT_DESTINATION="@default"
+declare -r DEF_TCP_CONNECT_REMOTE_PORT="5037"
+
+# Configuration
+declare -r QREXEC_START_SCRIPT="android.dev.StartRemoteADB"
+declare -r QREXEC_STOP_SCRIPT="android.dev.StopRemoteADB"
+
+#
+# UTILS
+#
+
+RED="\\033[1;31m"
+GREEN="\\033[1;32m"
+YELLOW="\\033[1;33m"
+BLUE="\\033[1;34m"
+MAGENTA="\\033[1;35m"
+CYAN="\\033[1;36m"
+BOLD="\\033[1m"
+END="\\033[1;00m"
+FATAL="\\033[1;37;41m" # WHITE on RED
+
+print_info () {
+    echo -e "${GREEN} [INFO]${END} $@"
+}
+
+print_error () {
+    echo -e "${RED} [ERROR]${END} $@"
+}
+
+print_warn () {
+    echo -e "${YELLOW} [WARN]${END} $@"
+}
+
+usage () {
+    local USAGE
+
+# \n is required to preserve whitespaces for the first line (and adding a new line before printing the usage message is a good deal)
+    read -r -d '' USAGE << EOM
+\n    Usage: ${SCRIPT_NAME} <command>
+
+    Start/Stop adb on remote VM (generally sys-usb) when not possible to reattach phone to dev-phone VM (due to support for android 10)
+
+    Parameters:
+        ${BOLD}<command>${END} must be a valid and started AppVM, as safe as possible:
+            - '${COMMAND_START}': Stop any local adb then start remote adb
+            - '${COMMAND_STOP}': Stop any remote adb
+            - '${COMMAND_RESTART}': Stop any local adb and remote adb then start remote adb
+    
+    Options:
+        -l|--local-port ${BOLD}<local_port>${END}
+            The port that will listen for TCP connection locally (default: '${DEF_TCP_CONNECT_LOCAL_PORT}')
+            Limited to numeric characters
+        
+        -d|--destination ${BOLD}<salt_root>${END}
+            The destination VM as defined in qubes.ConnectTCP file (default: '${DEF_TCP_CONNECT_DESTINATION}')
+            Limited to either '@default' keyword or alphanumeric, '-' and '_' characters
+        
+        -r|--remote-port ${BOLD}<remote_port>${END}
+            The port that will listen for TCP connection locally (default: '${DEF_TCP_CONNECT_REMOTE_PORT}')
+            Limited to numeric characters
+    
+    Others:
+        -h|--help: print this help message
+
+EOM
+    echo -e "${USAGE}"
+}
+
+#
+# FUNCTIONS
+#
+
+stop_local () {
+    local adb_pids
+    local adb_pid
+    local adb_command
+    local adb_port
+    local adb_found
+
+    print_info "Stopping local adb"
+
+    adb_found=false
+    adb_pids=`pidof adb`
+    if [[ $? -eq 0 ]]; then
+        for adb_pid in ${adb_pids}; do
+            adb_command=`ps -p ${adb_pid} -o args | sed -n '2p'`
+            if [[ "${adb_command}" =~ ^adb\ -L\ tcp:([0-9]+)\ fork-server\ server\  ]]; then
+                adb_port="${BASH_REMATCH[1]}"
+                if [[ "${adb_port}" == "${TCP_CONNECT_LOCAL_PORT}" ]]; then
+                    adb -H "localhost" -P "${adb_port}" kill-server
+                    print_info ">>> Local adb stopped successfully"
+                    adb_found=true
+                fi
+            else
+                print_error "Unexpected adb command" && usage && exit 1
+            fi
+        done
+        if [[ "${adb_found}" != true ]]; then
+            print_info ">>> No matching local adb server found"
+        fi
+    else
+        print_info ">>> No local adb server running"
+    fi
+}
+
+start_remote () {
+    local socat_pids
+    local socat_pid
+    local socat_command
+    local socat_local_port
+    local socat_destination
+    local socat_remote_port
+    local socat_found
+    
+    print_info "Starting remote adb"
+
+    
+
+    socat_found=false
+    socat_pids=`pidof socat`
+    if [[ $? -eq 0 ]]; then
+        for socat_pid in ${socat_pids}; do
+            socat_command=`ps -p ${socat_pid} -o args | sed -n '2p'`
+            if [[ "${socat_command}" =~ ^socat\ TCP-LISTEN:([0-9]+),reuseaddr,fork\ EXEC:qrexec-client-vm\ \\\'([a-zA-Z0-9@-]+)\\\'\ qubes\.ConnectTCP\+([0-9]+) ]]; then
+                socat_local_port="${BASH_REMATCH[1]}"
+                socat_destination="${BASH_REMATCH[2]}"
+                socat_remote_port="${BASH_REMATCH[3]}"
+
+                if [[ "${socat_local_port}" == "${TCP_CONNECT_LOCAL_PORT}" ]]; then
+                    socat_found=true
+                    print_warn ">>> Local TCP listener already started (assuming remote is also started)"
+                fi
+            else
+                print_error "Unexpected local TCP listener command" && usage && exit 1
+            fi
+        done
+    fi
+
+    if [[ "${socat_found}" != true ]]; then
+        qrexec-client-vm dom0 ${QREXEC_START_SCRIPT}
+        qvm-connect-tcp ${TCP_CONNECT_LOCAL_PORT}:${TCP_CONNECT_DESTINATION}:${TCP_CONNECT_REMOTE_PORT}
+    fi
+}
+
+stop_remote () {
+    local socat_pids
+    local socat_pid
+    local socat_command
+    local socat_local_port
+    local socat_destination
+    local socat_remote_port
+    local socat_found
+    
+    print_info "Stopping remote adb"
+
+    socat_found=false
+    socat_pids=`pidof socat`
+    if [[ $? -eq 0 ]]; then
+        for socat_pid in ${socat_pids}; do
+            socat_command=`ps -p ${socat_pid} -o args | sed -n '2p'`
+            if [[ "${socat_command}" =~ ^socat\ TCP-LISTEN:([0-9]+),reuseaddr,fork\ EXEC:qrexec-client-vm\ \\\'([a-zA-Z0-9@-]+)\\\'\ qubes\.ConnectTCP\+([0-9]+) ]]; then
+                socat_local_port="${BASH_REMATCH[1]}"
+                socat_destination="${BASH_REMATCH[2]}"
+                socat_remote_port="${BASH_REMATCH[3]}"
+
+                if [[ "${socat_local_port}" == "${TCP_CONNECT_LOCAL_PORT}" ]]; then
+                    socat_found=true
+                    kill -9 "${socat_pid}"
+                    if [[ $? -eq 0 ]]; then
+                        print_info ">>> Local TCP Listener killed successfully"
+                    else
+                        print_warn ">>> Killing local TCP Listener failed"
+                    fi
+                    
+                fi
+            else
+                print_error "Unexpected local TCP Listener command" && usage && exit 1
+            fi
+        done
+        if [[ "${socat_found}" != true ]]; then
+            print_info ">>> No matching local TCP Listener running"
+        fi
+    else
+        print_info ">>> No local TCP Listener running"
+    fi
+
+    qrexec-client-vm dom0 ${QREXEC_STOP_SCRIPT}
+}
+
+#
+# RETRIEVE INPUT
+#
+
+# Need help?
+case "$1" in
+    "-h"|"--help") usage && exit 0;;
+esac
+
+# Require root privileges
+if [[ "$EUID" -ne 0 ]]; then
+    print_error "Requires root privileges (please use sudo)" && usage && exit 1
+fi
+
+# Retrieve mandatory arguments
+if [[ $# -ge 1 ]]; then
+    COMMAND=$1
+    shift
+else
+    print_error "Missing command" && usage && exit 1
+fi
+
+# Look for options
+while [[ -n "$1" ]]; do
+    case "$1" in
+        "-d"|"--destination")
+            if [[ $# -ge 2 ]]; then
+                ARG_TCP_CONNECT_DESTINATION="$2"
+                shift 2
+            else
+                print_error "Missing destination after '$1'" && usage && exit 1
+            fi
+            ;;
+        "-l"|"--local-port")
+            if [[ $# -ge 2 ]]; then
+                ARG_TCP_CONNECT_LOCAL_PORT="$2"
+                shift 2
+            else
+                print_error "Missing local port after '$1'" && usage && exit 1
+            fi
+            ;;
+        "-r"|"--remote-port")
+            if [[ $# -ge 2 ]]; then
+                ARG_TCP_CONNECT_REMOTE_PORT="$2"
+                shift 2
+            else
+                print_error "Missing remote port after '$1'" && usage && exit 1
+            fi
+            ;;
+        "-h"|"--help") usage && exit 0;;
+        *) print_error "Unknown command '$1'" && usage && exit 1;;
+    esac
+done
+
+# Prepare options
+TCP_CONNECT_LOCAL_PORT=${ARG_TCP_CONNECT_LOCAL_PORT:-${DEF_TCP_CONNECT_LOCAL_PORT}}
+TCP_CONNECT_DESTINATION=${ARG_TCP_CONNECT_DESTINATION:-${DEF_TCP_CONNECT_DESTINATION}}
+TCP_CONNECT_REMOTE_PORT=${ARG_TCP_CONNECT_REMOTE_PORT:-${DEF_TCP_CONNECT_REMOTE_PORT}}
+
+#
+# INPUT VALIDATION
+#
+
+# Validate COMMAND
+actions=()
+case "${COMMAND}" in
+    "${COMMAND_START}")
+        actions+=("${ACTION_LOCAL_STOP}")
+        actions+=("${ACTION_REMOTE_START}")
+        ;;
+    "${COMMAND_STOP}")
+        actions+=("${ACTION_REMOTE_STOP}")
+        ;;
+    "${COMMAND_RESTART}")
+        actions+=("${ACTION_LOCAL_STOP}")
+        actions+=("${ACTION_REMOTE_STOP}")
+        actions+=("${ACTION_REMOTE_START}")
+        ;;
+    *) print_error "Invalid command: '${COMMAND}'" && usage && exit 1;;
+esac
+
+# Validate TCP_CONNECT_LOCAL_PORT
+[[ "${TCP_CONNECT_LOCAL_PORT}" =~ [^0-9]+ ]] && print_error "Invalid local port (not a number): '${TCP_CONNECT_LOCAL_PORT}'" && usage && exit 1
+
+# Validation TCP_CONNECT_DESTINATION
+if [ "${TCP_CONNECT_DESTINATION}" != "@default" ]; then
+    [[ "${TCP_CONNECT_DESTINATION}" =~ [^a-zA-Z0-9-]+ ]] && print_error "Invalid destination (bad characters): '${TCP_CONNECT_DESTINATION}'" && usage && exit 1
+fi
+
+# Validate TCP_CONNECT_REMOTE_PORT
+[[ "${TCP_CONNECT_REMOTE_PORT}" =~ [^0-9]+ ]] && print_error "Invalid remote port (not a number): '${TCP_CONNECT_REMOTE_PORT}'" && usage && exit 1
+
+#
+# MAIN PROCESS
+#
+
+for action in "${actions[@]}"; do
+    case "${action}" in
+        "${ACTION_LOCAL_STOP}")
+            stop_local
+            ;;
+        "${ACTION_REMOTE_START}")
+            start_remote
+            ;;
+        "${ACTION_REMOTE_STOP}")
+            stop_remote
+            ;;
+        *) print_error "Unsupported action '${action}'" && exit 1;;
+    esac
+done

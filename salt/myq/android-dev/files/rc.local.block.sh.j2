@@ -1,0 +1,5 @@
+# increase xen_gntalloc limit
+echo 4096 > /sys/module/xen_gntalloc/parameters/limit
+
+# attach already connected devices
+/usr/bin/qrexec-client-vm dom0 usb.{{ vmname }}.Attach

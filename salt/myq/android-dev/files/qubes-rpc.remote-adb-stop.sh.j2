@@ -1,0 +1,8 @@
+#!/bin/sh
+
+# Make sure adb is stopped on {{ usbvm }} and remove it
+qvm-run --user=user "{{ usbvm }}" "if [ -x \"\$(command -v adb)\" ]; then adb kill-server; fi"
+qvm-run --user=root "{{ usbvm }}" "rm -f /usr/local/bin/adb"
+
+# Remove adb keys
+qvm-run --user=root "{{ usbvm }}" "rm -fr /home/user/.android"

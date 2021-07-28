@@ -1,0 +1,15 @@
+#!/bin/sh
+
+# Make sure QREXEC_REMOTE_DOMAIN is defined
+[[ -z "${QREXEC_REMOTE_DOMAIN}" ]] && exit 1
+
+# Make sure adb is stopped on {{ usbvm }} and remove it
+qvm-run --user=user "{{ usbvm }}" "if [ -x \"\$(command -v adb)\" ]; then adb kill-server; fi"
+qvm-run --user=root "{{ usbvm }}" "rm -f /usr/local/bin/adb"
+
+# Moving adb from caller to {{ usbvm }}
+qvm-run --pass-io --user=root "${QREXEC_REMOTE_DOMAIN}" "cat /usr/local/android-sdk/platform-tools/adb" | qvm-run --pass-io --user=root "{{ usbvm }}" "cat > /usr/local/bin/adb"
+qvm-run --user=root "{{ usbvm }}" "chmod 755 /usr/local/bin/adb"
+
+# Start adb on {{ usbvm }}
+qvm-run --user=user "{{ usbvm }}" "adb start-server"

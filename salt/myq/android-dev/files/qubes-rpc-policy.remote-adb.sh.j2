@@ -1,0 +1,6 @@
+{%- if accumulator | default(False) -%}
+{%- for source in accumulator['remote_adb_policy_sources'] | default([]) -%}
+{{ source }} dom0 allow
+{% endfor -%}
+{%-  endif %}
+$anyvm $anyvm deny
