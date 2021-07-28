@@ -1,0 +1,27 @@
+# -*- coding: utf-8 -*-
+# vim: set syntax=jinja ts=2 sw=2 sts=2 et :
+
+{# Compute domain and name from state hierarchy #}
+{% set s = sls.split('.') %}
+{% if s|length > 1 %}
+{% set _domain = s[s|length - 2] %}
+{% set _name = s[s|length - 1] %}
+{% endif %}
+
+{# Override domain and name from conf if defined #}
+{% set domain = (conf | default({})).domain | default(_domain) %}
+{% set name = (conf | default({})).name | default(_name) %}
+
+{# Retrieve defaults #}
+{% set defaults = salt['pillar.get'](
+    'defaults:' ~ domain,
+    default=salt['pillar.get']('defaults:_global_'),
+    merge=True
+)%}
+
+{# Prepare context #}
+{% do qcontext.update(domain = domain) %}
+{% do qcontext.update(name = name) %}
+{% do qcontext.update(defaults = defaults) %}
+
+

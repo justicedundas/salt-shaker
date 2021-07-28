@@ -1,0 +1,11 @@
+#!/bin/sh
+
+# Network profiles cleanup script must be idempotent as it will be call every time a new profile is set, even if no previous profile had been set.
+
+if qvm-check --quiet --running "{{ netvm }}" 2> /dev/null; then
+    qvm-run --user=root "{{ netvm }}" "rm --interactive=never /rw/config/NM-system-connections/*"
+
+    qvm-run --user=root "{{ netvm }}" "nmcli connection reload"
+
+    notify-send "Network profiles cleaned"
+fi

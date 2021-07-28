@@ -1,0 +1,33 @@
+# -*- coding: utf-8 -*-
+# vim: set syntax=yaml ts=2 sw=2 sts=2 et :
+
+#!yaml|gpg
+
+network-profiles:
+  profile1:
+    name: My first profile
+    wifi:
+      myfirstwifissid:
+        autoconnect: 999
+        secret: |
+          -----BEGIN PGP MESSAGE-----
+
+          XXXX
+          -----END PGP MESSAGE-----
+      mysecondwifissid:
+        autoconnect: 0
+        secret: |
+          -----BEGIN PGP MESSAGE-----
+
+          YYYY
+          -----END PGP MESSAGE-----
+  profile2:
+    name: My second profile
+    wifi:
+      mythirdwifissid:
+        autoconnect: 999
+        secret: |
+          -----BEGIN PGP MESSAGE-----
+
+          AAAA
+          -----END PGP MESSAGE-----

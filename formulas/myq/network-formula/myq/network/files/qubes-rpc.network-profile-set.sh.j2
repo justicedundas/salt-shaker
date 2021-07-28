@@ -1,0 +1,61 @@
+#!/bin/sh
+
+declare -r NMCONN_FILE_LOCATION="/rw/config/NM-system-connections"
+declare -r NMCONN_FILE_TEMPLATE="salt://myq/network/files/nmconnection-wifi.j2"
+
+function src_nmconn_file() {
+    local tmp=$1
+    local ssid=$2
+
+    echo "${tmp_dir}/${ssid}.nmconnection"
+    return 0
+}
+
+function dst_nmconn_file() {
+    local ssid=$1
+
+    echo "${NMCONN_FILE_LOCATION}/${ssid}.nmconnection"
+    return 0
+}
+
+function configure_wifi_connection() {
+    local ssid=$1
+    local ifname=$2
+    local tmp_dir=$(mktemp -d --suffix=-nm-wifi-config --tmpdir=/tmp)
+    local src_nmconn_file=$(src_nmconn_file "${tmp_dir}" "${ssid}")
+    local dst_nmconn_file=$(dst_nmconn_file "${ssid}")
+
+    sudo qubesctl state.single file.managed \
+        name="${src_nmconn_file}" \
+        source="${NMCONN_FILE_TEMPLATE}" \
+        template="jinja" \
+        context="{\"profile\":\"{{ profile }}\",\"ssid\":\"${ssid}\",\"ifname\":\"${ifname}\"}"
+    
+    cat "${src_nmconn_file}" | qvm-run --pass-io --user=root "{{ netvm }}" "cat > ${dst_nmconn_file}"
+    if [ $? -eq 0 ]; then
+        qvm-run --user=root "{{ netvm }}" "chmod 600 ${dst_nmconn_file}"
+    else
+        qvm-run --user=root "{{ netvm }}" "rm -f ${dst_nmconn_file}"
+    fi
+    
+    rm -fr "${tmp_dir}"
+
+}
+
+# Clean up profiles prior applying a new one
+/etc/qubes-rpc/network.profile.Clean
+
+if qvm-check --quiet --running "{{ netvm }}" 2> /dev/null; then
+
+    ifname=$(qvm-run --pass-io --user=root "{{ netvm }}" "nmcli -t dev | grep -E \"^[^:]+:wifi:.*\" | head -1 | cut -d: -f1")
+
+    [[ -z "${ifname}" ]] && notify-send "No network interace found for wifi" && exit 1
+
+{% for ssid in wifi %}
+    configure_wifi_connection "{{ ssid }}" "${ifname}"
+{% endfor %}
+
+    qvm-run --user=root "{{ netvm }}" "nmcli connection reload"
+
+    notify-send "Network profile {{ profilename }} deployed"
+fi

@@ -1,0 +1,10 @@
+# -*- coding: utf-8 -*-
+# vim: set syntax=jinja ts=2 sw=2 sts=2 et :
+
+{% macro appvm_id(name) -%}
+appvm-{{ name }}
+{%- endmacro %}
+
+{% macro template_id(name) -%}
+template-{{ name }}
+{%- endmacro %}
