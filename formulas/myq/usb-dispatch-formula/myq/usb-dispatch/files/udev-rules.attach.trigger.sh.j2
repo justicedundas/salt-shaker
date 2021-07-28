@@ -1,0 +1,24 @@
+# -*- coding: utf-8 -*-
+# vim: set syntax=jinja ts=2 sw=2 sts=2 et :
+
+{%- set vendors = {} -%}
+{%- for device in devices | list -%}
+{%-  for triggers in device['triggers'] | list -%}
+{%-   if vendors[triggers['vendor']] is undefined -%}
+{%-    do vendors.update({triggers['vendor'] : {}}) -%}
+{%-   endif -%}
+{%-   if vendors[triggers['vendor']][triggers['product']] is undefined -%}
+{%-    do vendors[triggers['vendor']].update({triggers['product'] : []}) -%}
+{%-   endif -%}
+{%-   do vendors[triggers['vendor']][triggers['product']].append(device['desc']) -%}
+{%-  endfor -%}
+{%- endfor -%}
+#
+# Allow automatic attachment to {{ vmname }}
+#
+{%- for vendor, products in vendors.items() %}
+{%      for product, descriptions in products.items() %}
+# Triggers for {{ descriptions | join(', ') | truncate(70) }}
+SUBSYSTEM=="usb", ATTR{idVendor}=="{{ vendor }}", ATTR{idProduct}=="{{ product }}", RUN+="/usr/bin/qrexec-client-vm dom0 usb.{{ vmname }}.Attach"
+{%      endfor %}
+{%- endfor %}

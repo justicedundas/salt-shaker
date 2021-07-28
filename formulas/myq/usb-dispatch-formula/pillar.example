@@ -1,0 +1,17 @@
+# -*- coding: utf-8 -*-
+# vim: set syntax=yaml ts=2 sw=2 sts=2 et :
+
+usb-dispatch:
+  dev-phone:
+    - # my phone
+      desc: My phone
+      qvm-usb-ids:
+        - Manuf1_Product1_Serial1
+        - Google_Android_Serial1
+      triggers:
+        - # Bootloader
+          vendor: 'xxxx'
+          product: 'yyyy'
+        - # Recovery - Foo
+          vendor: 'aaaa'
+          product: 'bbbb'

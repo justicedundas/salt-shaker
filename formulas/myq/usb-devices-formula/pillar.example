@@ -1,0 +1,13 @@
+# -*- coding: utf-8 -*-
+# vim: set syntax=yaml ts=2 sw=2 sts=2 et :
+
+usb-devices:
+  - # my phone
+    desc: My Phone
+    permissions-for:
+      - # Bootloader
+        vendor: 'xxxx'
+        product: 'yyyy'
+      - # Recovery - Foo
+        vendor: 'aaaa'
+        product: 'bbbb'

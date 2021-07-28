@@ -1,0 +1,6 @@
+# udev rules
+for rules in {{ udevrulesfolder }}/*; do
+    [ -e "${rules}" ] || continue;
+    ln -s "${rules}" "/etc/udev/rules.d"
+done
+udevadm control --reload

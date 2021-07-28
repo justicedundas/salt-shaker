@@ -1,0 +1,24 @@
+# -*- coding: utf-8 -*-
+# vim: set syntax=jinja ts=2 sw=2 sts=2 et :
+
+{%- set vendors = {} -%}
+{%- for device in devices | list -%}
+{%-  for permissions in device['permissions-for'] | list -%}
+{%-   if vendors[permissions['vendor']] is undefined -%}
+{%-    do vendors.update({permissions['vendor'] : {}}) -%}
+{%-   endif -%}
+{%-   if vendors[permissions['vendor']][permissions['product']] is undefined -%}
+{%-    do vendors[permissions['vendor']].update({permissions['product'] : []}) -%}
+{%-   endif -%}
+{%-   do vendors[permissions['vendor']][permissions['product']].append(device['desc']) -%}
+{%-  endfor -%}
+{%- endfor -%}
+#
+# Allow automatic permissions for android devices
+#
+{%- for vendor, products in vendors.items() %}
+{%   for product, descriptions in products.items() %}
+# Permissions for {{ descriptions | join(', ') | truncate(70) }}
+SUBSYSTEM=="usb", ATTR{idVendor}=="{{ vendor }}", ATTR{idProduct}=="{{ product }}", MODE="0666"
+{%   endfor %}
+{%- endfor %}

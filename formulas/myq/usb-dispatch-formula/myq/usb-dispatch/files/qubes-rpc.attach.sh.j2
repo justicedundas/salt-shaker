@@ -1,0 +1,15 @@
+#!/bin/sh
+
+if qvm-check --quiet --running "{{ vmname }}" 2> /dev/null; then
+{%- for device in devices | list -%}
+{%   for qvmusbid in device['qvm-usb-ids'] %}
+    #
+    # Allow automatic attachment to {{ vmname }} of {{ device['desc'] }}
+    #
+    if qvm-usb | grep "{{ qvmusbid }}" > /dev/null 2>&1; then
+        domdev=`qvm-usb | grep "{{ qvmusbid }}" | cut -d' ' -f1`
+        qvm-usb attach {{ vmname }} ${domdev}
+    fi
+{%   endfor %}
+{%- endfor -%}
+fi
